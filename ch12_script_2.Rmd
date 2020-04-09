@@ -31,6 +31,13 @@ Third, consider a school with average faculty salary of $50,000 and average SAT 
 
 Fourth (and optional! not covered in the book!), check out the `predict()` function. This allows you to avoid typing out the formula yourself.
 
+```{r}
+model_1 <- lm(earnings ~ sat + faculty, data = x)
+
+predict(model_1, newdata = data.frame(faculty = 50, sat = 1200))
+```
+
+
 
 
 ### Scene 8
@@ -45,6 +52,13 @@ Third, determine the school with the largest positive residual and the school wi
 
 Fourth, speculate about what causes these residuals. What is the model missing? How might we improve the model?
 
+```{r}
+model_1 %>%
+  augment(x) %>% 
+  filter(.resid %in% c(min(.resid),max(.resid)))
+```
+
+
 
 ### Scene 9
 
@@ -58,13 +72,45 @@ Third, use `tidy()` to find the confidence intervals for the regression coeffici
 
 Fourth, interpret the confidence interval for coefficient on `public` using one sentence for the Bayesian interpretation and one sentence for the Frequentist interpretation.
 
+```{r}
+model_2 <- lm(earnings ~ public * price, data = x)
 
+tidy(model_2, conf.int = T)
+```
+
+Without interaction:
+On average, graduates of public schools made 14.9 thousand dollars more per year on average. Every additional dollar increase in price corresponded to a 1.39 dollar increase in earnings.
+
+With interaction:
+On average, graduates of public schools made 11.1 thousand dollars more per year on average. Every additional dollar increase in price corresponded to a 1.35 dollar increase in earnings,
+plus another 0.97 dollars if the student attended a public school.
 
 ### Scene 10
 
 **Prompt:** In the previous scene, we generated the confidence intervals using `tidy(conf.int = TRUE)`. Let's check those confidence intervals by doing our own bootstrapping. Set `reps = 100` to save processing time. Hints: `unnest()`, `group_by()`, and `summarize()` are useful here, especially `unnest()` which you may not have seen before.
 
 In other words, you are not using `tidy(conf.int = TRUE)`. You are just using `tidy()`. That gives you the tibble of the regression estimates. Then, you can use `unnest()` to "explode" out a row for each estimate. Then, `group_by(term)` and the usual quantile trick for each parameter should give you what you want.
+
+```{r}
+reps = 100
+
+rep_sample_n(x, size = nrow(x), reps = 100, replace = T) %>% 
+  group_by(replicate) %>%
+  nest() %>%
+  mutate(mod = map(data, ~ tidy(lm(earnings ~ public * price, data = .)))) %>%
+  unnest(mod) %>%
+  group_by(term) %>%
+  # pull(estimate) %>%
+  summarize(conf.int = list(quantile(estimate, c(0.025,0.975)))) %>%
+  mutate(lower = map_dbl(conf.int, ~ .[1],),
+         upper = map_dbl(conf.int, ~ .[2]))
+  
+
+glimpse(strapped)
+
+model_2 %>% tidy() %>%
+```
+
 
 
 ### Scene 11
